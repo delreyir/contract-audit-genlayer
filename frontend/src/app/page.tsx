@@ -1,20 +1,21 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { CONTRACT_ADDRESS, connectWallet, readClient, shortAddr, type WalletState } from "@/lib/genlayer";
 import { TransactionStatus } from "genlayer-js/types";
 
 type Audit = { id: string; requester: string; code: string; language: string; context: string; fee: string; status: number; report: string; };
-
 const sevColor = (s: string) => ({ clean: "#22c55e", low: "#84cc16", medium: "#eab308", high: "#f97316", critical: "#ef4444" }[s] || "#6b7280");
 
 export default function Home() {
   const [wallet, setWallet] = useState<WalletState>({ address: null, client: null });
   const [audits, setAudits] = useState<Audit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<"browse" | "create">("browse");
-  const [selected, setSelected] = useState<Audit | null>(null);
+  const [view, setView] = useState<{ kind: "list" } | { kind: "new" } | { kind: "detail"; id: string }>({ kind: "list" });
   const [form, setForm] = useState({ code: "", language: "Solidity", context: "", fee: "1" });
-  const [tx, setTx] = useState("");
+  const [history, setHistory] = useState<string[]>(["audit-shell v1.0 — GenLayer security scanner", "type a command or click below. wallet required for writes.", ""]);
+  const termRef = useRef<HTMLDivElement>(null);
+
+  const log = (s: string) => setHistory(h => [...h, s]);
 
   const load = useCallback(async () => {
     try {
@@ -29,119 +30,124 @@ export default function Home() {
     } catch (e) { console.error(e); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { termRef.current?.scrollTo(0, termRef.current.scrollHeight); }, [history]);
 
   async function handleConnect() {
-    setTx("$ connecting wallet...");
-    try { const w = await connectWallet(); setWallet(w); setTx(`$ connected ${shortAddr(w.address!)}`); }
-    catch (e: any) { setTx(`! ${e.message}`); }
+    log("$ wallet connect");
+    try { const w = await connectWallet(); setWallet(w); log(`  → authorized ${w.address}`); }
+    catch (e: any) { log(`  ! ${e.message}`); }
+    log("");
   }
 
   async function send(fn: string, args: any[], value?: bigint) {
-    if (!wallet.client) { setTx("! connect wallet first"); return; }
-    setLoading(true); setTx(`$ exec ${fn}...`);
+    if (!wallet.client) { log("  ! no wallet — run `connect` first"); log(""); return; }
+    setLoading(true); log(`$ ${fn} ${args.map(a => typeof a === "string" && a.length > 20 ? "<data>" : a).join(" ")}`);
     try {
       const hash = await wallet.client.writeContract({ address: CONTRACT_ADDRESS, functionName: fn, args, value: value ?? BigInt(0) });
+      log(`  tx ${hash.slice(0, 18)}… submitted`);
       await wallet.client.waitForTransactionReceipt({ hash, status: TransactionStatus.ACCEPTED });
-      setTx("$ ok — on-chain"); await load(); setSelected(null);
-    } catch (e: any) { setTx(`! ${e.message}`); }
-    setLoading(false);
+      log("  → accepted ✓"); await load();
+    } catch (e: any) { log(`  ! ${e.message}`); }
+    log(""); setLoading(false);
   }
 
+  const prompt = (
+    <span><span style={{ color: "#15803d" }}>root@genlayer</span><span style={{ color: "#3f6212" }}>:</span><span style={{ color: "#2dd4bf" }}>~/audit</span><span style={{ color: "#15803d" }}>$ </span></span>
+  );
+
   return (
-    <div style={{ minHeight: "100vh", background: "#000", color: "#22c55e", fontFamily: "'SF Mono',Menlo,Consolas,monospace" }}>
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "26px 20px 80px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1a3a1a", paddingBottom: 16 }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 22, color: "#22c55e" }}>
-              <span style={{ color: "#15803d" }}>~/</span>contract-audit <span style={{ color: "#15803d" }}>$</span>
-            </h1>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#4d7c4d" }}># AI-powered smart contract security audits</p>
-          </div>
-          {wallet.address ? (
-            <div style={{ ...pill }}>● {shortAddr(wallet.address)}</div>
-          ) : (
-            <button onClick={handleConnect} style={btn}>[ connect_wallet ]</button>
-          )}
+    <div style={{ minHeight: "100vh", background: "#000", padding: 16, fontFamily: "'SF Mono',Menlo,Consolas,monospace" }}>
+      {/* terminal window chrome */}
+      <div style={{ maxWidth: 920, margin: "0 auto", border: "1px solid #1a3a1a", borderRadius: 10, overflow: "hidden", boxShadow: "0 0 60px rgba(34,197,94,0.08)" }}>
+        <div style={{ background: "#0c140c", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid #1a3a1a" }}>
+          <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#ef4444" }} />
+          <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#eab308" }} />
+          <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#22c55e" }} />
+          <span style={{ marginLeft: 10, color: "#4d7c4d", fontSize: 13 }}>contract-audit — security scanner — {wallet.address ? shortAddr(wallet.address) : "no wallet"}</span>
+          <button onClick={handleConnect} style={{ marginLeft: "auto", background: "none", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 4, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", fontSize: 12 }}>
+            {wallet.address ? "● connected" : "connect"}
+          </button>
         </div>
 
-        {tx && <div style={statusBar}>{tx}<span style={{ animation: "blink 1s steps(1) infinite" }}>_</span></div>}
-
-        <div style={{ display: "flex", gap: 8, margin: "20px 0" }}>
-          <button onClick={() => { setTab("browse"); setSelected(null); }} style={tabBtn(tab === "browse")}>./audits</button>
-          <button onClick={() => { setTab("create"); setSelected(null); }} style={tabBtn(tab === "create")}>./new_audit</button>
+        {/* terminal body */}
+        <div ref={termRef} style={{ background: "#000", color: "#22c55e", padding: 16, height: 230, overflowY: "auto", fontSize: 13, lineHeight: 1.7 }}>
+          {history.map((line, i) => <div key={i} style={{ whiteSpace: "pre-wrap", color: line.startsWith("  !") ? "#ef4444" : line.startsWith("  →") ? "#86efac" : "#22c55e" }}>{line.startsWith("$") ? <>{prompt}{line.slice(2)}</> : line}</div>)}
+          <div>{prompt}<span style={{ animation: "blink 1s steps(1) infinite" }}>▋</span></div>
         </div>
 
-        {tab === "create" && (
-          <form onSubmit={e => { e.preventDefault(); send("request_audit", [form.code, form.language, form.context], BigInt(form.fee || "0") * BigInt(10 ** 18)); }} style={card}>
-            <label style={lbl}>{">"} LANGUAGE</label>
+        {/* command bar */}
+        <div style={{ background: "#0c140c", borderTop: "1px solid #1a3a1a", padding: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => setView({ kind: "list" })} style={cmd(view.kind === "list")}>ls audits</button>
+          <button onClick={() => setView({ kind: "new" })} style={cmd(view.kind === "new")}>new audit</button>
+          <span style={{ color: "#2d4d2d", alignSelf: "center", fontSize: 12 }}>·  {audits.length} audit(s) on-chain</span>
+        </div>
+      </div>
+
+      {/* output panel below terminal */}
+      <div style={{ maxWidth: 920, margin: "16px auto 60px" }}>
+        {view.kind === "new" && (
+          <form onSubmit={e => { e.preventDefault(); send("request_audit", [form.code, form.language, form.context], BigInt(form.fee || "0") * BigInt(10 ** 18)); setView({ kind: "list" }); }} style={panel}>
+            <div style={{ color: "#4d7c4d", marginBottom: 10 }}># compose new audit request</div>
             <select value={form.language} onChange={e => setForm({ ...form, language: e.target.value })} style={inp}>
               <option>Solidity</option><option>Python</option><option>Rust</option><option>Move</option>
             </select>
-            <label style={lbl}>{">"} CONTRACT_CODE</label>
-            <textarea placeholder="// paste your contract here" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required rows={10} style={inp} />
-            <label style={lbl}>{">"} CONTEXT</label>
-            <input placeholder="what does this contract do?" value={form.context} onChange={e => setForm({ ...form, context: e.target.value })} required style={inp} />
-            <label style={lbl}>{">"} FEE (GEN)</label>
-            <input type="number" min="1" value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} required style={inp} />
-            <button type="submit" disabled={loading} style={{ ...btn, marginTop: 14, width: "100%" }}>[ run_audit ]</button>
+            <textarea placeholder="// paste contract source" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required rows={10} style={inp} />
+            <input placeholder="--context: what does it do?" value={form.context} onChange={e => setForm({ ...form, context: e.target.value })} required style={inp} />
+            <input placeholder="--fee (GEN)" type="number" min="1" value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} required style={inp} />
+            <button type="submit" disabled={loading} style={{ ...cmd(true), padding: "10px 18px", marginTop: 8 }}>$ submit_audit</button>
           </form>
         )}
 
-        {tab === "browse" && !selected && (
-          <div style={{ display: "grid", gap: 10 }}>
-            {audits.length === 0 && <p style={{ color: "#4d7c4d" }}># no audits in queue</p>}
-            {audits.map(a => (
-              <div key={a.id} onClick={() => setSelected(a)} style={{ ...card, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>[{String(a.id).padStart(3, "0")}] {a.language} · {a.context.slice(0, 36)}</span>
-                {a.report ? (() => { const r = JSON.parse(a.report); return <span style={{ ...pill, color: sevColor(r.severity), borderColor: sevColor(r.severity) }}>{r.severity} {r.score}/10</span>; })() : <span style={{ ...pill, color: "#eab308", borderColor: "#854d0e" }}>queued</span>}
-              </div>
-            ))}
+        {view.kind === "list" && (
+          <div style={{ display: "grid", gap: 8 }}>
+            {audits.length === 0 && <div style={{ ...panel, color: "#4d7c4d" }}># no audits found. run `new audit`.</div>}
+            {audits.map(a => {
+              const r = a.report ? JSON.parse(a.report) : null;
+              return (
+                <div key={a.id} onClick={() => setView({ kind: "detail", id: a.id })} style={{ ...panel, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "#86efac" }}>[{String(a.id).padStart(3, "0")}] {a.language} · <span style={{ color: "#4d7c4d" }}>{a.context.slice(0, 38)}</span></span>
+                  {r ? <span style={{ color: sevColor(r.severity), border: `1px solid ${sevColor(r.severity)}`, padding: "2px 10px", borderRadius: 4, fontSize: 12 }}>{r.severity} · {r.score}/10</span> : <span style={{ color: "#eab308", fontSize: 12 }}>● queued</span>}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {tab === "browse" && selected && (
-          <div style={card}>
-            <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: "#22c55e", cursor: "pointer", fontFamily: "inherit" }}>{"<"} back</button>
-            <h3 style={{ marginTop: 10 }}>[{String(selected.id).padStart(3, "0")}] {selected.language}</h3>
-            <p style={{ color: "#4d7c4d", fontSize: 13 }}># {selected.context}</p>
-            <pre style={{ background: "#0a0f0a", border: "1px solid #1a3a1a", padding: 12, borderRadius: 6, overflow: "auto", maxHeight: 180, fontSize: 12, color: "#86efac" }}>{selected.code}</pre>
-
-            {selected.report && (() => {
-              const r = JSON.parse(selected.report);
-              return (
-                <div style={{ marginTop: 14 }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
-                    <span style={{ ...pill, color: sevColor(r.severity), borderColor: sevColor(r.severity), fontSize: 14 }}>{r.severity.toUpperCase()}</span>
-                    <span style={{ color: "#86efac" }}>score: {r.score}/10</span>
-                    <span style={{ color: "#4d7c4d" }}>issues: {r.issues_count}</span>
+        {view.kind === "detail" && (() => {
+          const a = audits.find(x => x.id === view.id); if (!a) return null;
+          const r = a.report ? JSON.parse(a.report) : null;
+          return (
+            <div style={panel}>
+              <button onClick={() => setView({ kind: "list" })} style={{ background: "none", border: "none", color: "#22c55e", cursor: "pointer", fontFamily: "inherit" }}>$ cd ..</button>
+              <div style={{ color: "#4d7c4d", marginTop: 8 }}># audit [{String(a.id).padStart(3, "0")}] · {a.language} · {a.context}</div>
+              <pre style={{ background: "#000", border: "1px solid #1a3a1a", padding: 12, borderRadius: 6, overflow: "auto", maxHeight: 200, fontSize: 12, color: "#86efac", marginTop: 10 }}>{a.code}</pre>
+              {r ? (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                    <span style={{ color: sevColor(r.severity), fontSize: 16, fontWeight: 700 }}>{r.severity.toUpperCase()}</span>
+                    <span style={{ color: "#86efac" }}>score {r.score}/10</span>
+                    <span style={{ color: "#4d7c4d" }}>{r.issues_count} issue(s)</span>
                   </div>
                   <p style={{ color: "#86efac" }}>{r.summary}</p>
                   {(r.issues || []).map((iss: any, i: number) => (
-                    <div key={i} style={{ background: "#0a0f0a", padding: 12, borderRadius: 6, marginTop: 8, borderLeft: `3px solid ${sevColor(iss.severity)}` }}>
+                    <div key={i} style={{ background: "#000", padding: 12, borderRadius: 6, marginTop: 8, borderLeft: `3px solid ${sevColor(iss.severity)}` }}>
                       <strong style={{ color: sevColor(iss.severity) }}>{iss.title}</strong> <span style={{ color: "#4d7c4d", fontSize: 12 }}>[{iss.severity}]</span>
                       <p style={{ margin: "6px 0", color: "#a3a3a3", fontSize: 13 }}>{iss.description}</p>
-                      <p style={{ margin: 0, color: "#22c55e", fontSize: 13 }}>fix: {iss.fix}</p>
+                      <p style={{ margin: 0, color: "#22c55e", fontSize: 13 }}>→ {iss.fix}</p>
                     </div>
                   ))}
                 </div>
-              );
-            })()}
-
-            {selected.status === 0 && <button onClick={() => send("run_audit", [selected.id])} disabled={loading} style={{ ...btn, marginTop: 14 }}>[ run_audit ]</button>}
-          </div>
-        )}
-
-        <footer style={{ marginTop: 50, color: "#2d4d2d", fontSize: 11 }}># genlayer ai consensus · {shortAddr(CONTRACT_ADDRESS)}</footer>
+              ) : <button onClick={() => send("run_audit", [a.id])} disabled={loading} style={{ ...cmd(true), padding: "10px 18px", marginTop: 12 }}>$ run_audit {a.id}</button>}
+            </div>
+          );
+        })()}
       </div>
-      <style>{`@keyframes blink{50%{opacity:0}}`}</style>
+      <div style={{ textAlign: "center", color: "#2d4d2d", fontFamily: "monospace", fontSize: 11 }}># genlayer ai consensus · {shortAddr(CONTRACT_ADDRESS)}</div>
+      <style>{`@keyframes blink{50%{opacity:0}} body{margin:0}`}</style>
     </div>
   );
 }
 
-const card: React.CSSProperties = { background: "#080c08", border: "1px solid #1a3a1a", borderRadius: 6, padding: 18 };
-const inp: React.CSSProperties = { padding: 10, borderRadius: 4, border: "1px solid #1a3a1a", background: "#000", color: "#86efac", fontSize: 13, width: "100%", boxSizing: "border-box", marginBottom: 4, fontFamily: "inherit" };
-const lbl: React.CSSProperties = { fontSize: 11, color: "#4d7c4d", marginTop: 12, display: "block" };
-const btn: React.CSSProperties = { padding: "10px 18px", borderRadius: 4, border: "1px solid #22c55e", background: "#001a00", color: "#22c55e", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 };
-const pill: React.CSSProperties = { padding: "3px 10px", borderRadius: 4, fontSize: 12, border: "1px solid #22c55e", color: "#22c55e" };
-const statusBar: React.CSSProperties = { background: "#0a0f0a", border: "1px solid #1a3a1a", padding: 10, borderRadius: 4, fontSize: 13, color: "#22c55e", marginTop: 14 };
-const tabBtn = (a: boolean): React.CSSProperties => ({ padding: "8px 16px", background: a ? "#001a00" : "transparent", border: "1px solid " + (a ? "#22c55e" : "#1a3a1a"), borderRadius: 4, color: a ? "#22c55e" : "#4d7c4d", cursor: "pointer", fontFamily: "inherit", fontWeight: 700 });
+const panel: React.CSSProperties = { background: "#080c08", border: "1px solid #1a3a1a", borderRadius: 8, padding: 16, color: "#22c55e", fontSize: 13 };
+const inp: React.CSSProperties = { padding: 10, borderRadius: 4, border: "1px solid #1a3a1a", background: "#000", color: "#86efac", fontSize: 13, width: "100%", boxSizing: "border-box", marginBottom: 8, fontFamily: "'SF Mono',Menlo,monospace" };
+const cmd = (a: boolean): React.CSSProperties => ({ background: a ? "#001a00" : "transparent", border: "1px solid " + (a ? "#22c55e" : "#1a3a1a"), color: a ? "#22c55e" : "#4d7c4d", borderRadius: 4, padding: "6px 12px", cursor: "pointer", fontFamily: "'SF Mono',Menlo,monospace", fontSize: 13 });
