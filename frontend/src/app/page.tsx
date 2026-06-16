@@ -100,6 +100,16 @@ export default function Home() {
 
         {view.kind === "list" && (
           <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ ...panel, borderLeft: "3px solid #22c55e" }}>
+              <div style={{ color: "#86efac", fontWeight: 700 }}># man contract-audit</div>
+              <div style={{ color: "#4d7c4d", marginTop: 6, lineHeight: 1.7 }}>AI-powered smart-contract security scanner. Paste Solidity / Python / Rust / Move code and a panel of GenLayer AI validators independently reviews it for vulnerabilities, logic bugs and bad practices — they must agree on the severity before the report is written on-chain.</div>
+              <div style={{ marginTop: 10, color: "#22c55e" }}>
+                <div>$ 1. connect      <span style={{ color: "#4d7c4d" }}># link your wallet (top right)</span></div>
+                <div>$ 2. new audit    <span style={{ color: "#4d7c4d" }}># paste code + context + fee</span></div>
+                <div>$ 3. run_audit    <span style={{ color: "#4d7c4d" }}># AI validators scan the code</span></div>
+                <div>$ 4. read report  <span style={{ color: "#4d7c4d" }}># severity, issues & fixes on-chain</span></div>
+              </div>
+            </div>
             {audits.length === 0 && <div style={{ ...panel, color: "#4d7c4d" }}># no audits found. run `new audit`.</div>}
             {audits.map(a => {
               const r = a.report ? JSON.parse(a.report) : null;
