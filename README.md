@@ -1,57 +1,114 @@
-# 🛡️ ContractAudit
+# 🔐 ContractAudit
 
-**Decentralized smart contract security audits, powered by AI consensus.**
+**Decentralized smart-contract security audits, powered by AI consensus.**
 
-Paste your contract code, pay a small fee, and multiple AI validators independently analyze it for vulnerabilities, logic bugs, and best practice violations. Get an on-chain audit report with severity rating, specific issues found, and recommended fixes — all verified through GenLayer's consensus.
+🔗 **Live app:** https://contract-audit-4cw.pages.dev
+📜 **Contract (GenLayer Studionet):** `0x80687bBECc6B73b24b9c21DA2324a5de1d584D1E`
 
 ---
 
-## Why This Exists
+## The Problem
 
-Traditional audits cost $5k-$100k and take weeks. Automated tools miss context. ContractAudit gives you an instant, multi-AI-verified security review for a fraction of the cost. Not a replacement for top-tier audits on mainnet contracts — but perfect for development, learning, pre-audit screening, and catching obvious issues before they become exploits.
+Professional audits cost $5k–$100k and take weeks. Automated scanners miss context. There's no fast, affordable way to get a multi-perspective security review during development or before a smaller deployment.
+
+ContractAudit gives you an instant, multi-AI-verified security review. Not a replacement for a top-tier mainnet audit — but ideal for development, learning, pre-audit screening, and catching obvious issues before they become exploits.
 
 ---
 
 ## How It Works
 
-1. **Submit Code** — Paste your contract (Solidity, Python, Rust, Move)
-2. **Pay Fee** — Small GEN amount covers validator computation
-3. **AI Audit** — Multiple AI validators independently:
-   - Analyze for reentrancy, overflow, access control flaws
-   - Check logic bugs and edge cases
-   - Evaluate gas efficiency
-   - Score overall security (1-10)
-4. **On-Chain Report** — Severity, issues list with fixes, stored permanently
+1. **Connect your wallet** (MetaMask, Rabby, or any EVM wallet — no Snap required)
+2. **Submit code** — paste a contract (Solidity, Python, Rust, Move), add context, pay a small fee.
+3. **Run the audit** — a panel of GenLayer AI validators independently analyzes it.
+4. **Read the report** — severity rating, list of issues with locations and fixes, and an overall score — stored on-chain.
 
 ---
 
-## Consensus Model
+## What It Checks
 
-Validators must agree on:
-- **Severity level** (critical/high/medium/low/clean) — must match exactly
-- **Security score** — within ±2
-- **Issue count** — within ±1
-
-This prevents a single AI from having an off day and stamping a vulnerable contract as safe.
+- Security vulnerabilities (reentrancy, overflow, access control)
+- Logic bugs and edge cases
+- Gas / efficiency issues
+- Best-practice violations
 
 ---
 
-## Deployed Contract
+## Why GenLayer?
 
-**Network:** GenLayer Studionet  
-**Address:** (see deployment output)
+A normal contract can't read and reason about source code. GenLayer validators each analyze the code independently and must agree on the **severity** (exact match), **score** (±2), and **issue count** (±1) before the report finalizes — so one AI "having a bad day" can't stamp a vulnerable contract as safe.
 
 ---
 
-## Quick Start
+## Wallet & Network
+
+Standard EVM wallet, normal signing popup — **no GenLayer Snap**. On connect it adds/switches to the **GenLayer Studio Network** (chain `61999`, RPC `https://studio.genlayer.com/api`).
+
+---
+
+## Contract API
+
+| Method | Type | Description |
+|--------|------|-------------|
+| `request_audit(code, language, context)` | payable | Submit code with the audit fee |
+| `run_audit(audit_id)` | write (AI) | Run the multi-AI security review |
+| `get_audit(audit_id)` | view | Full report (severity, issues, fixes) |
+| `get_audit_count()` | view | Total audits |
+
+**Consensus rule:** `severity` must match exactly; `score` within ±2; `issues_count` within ±1.
+
+---
+
+## Project Structure
+
+```
+contract-audit-genlayer/
+├── contracts/
+│   └── contract_audit.py    # GenLayer Intelligent Contract (Python)
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx     # Terminal-emulator UI
+│   │   └── lib/
+│   │       └── genlayer.ts  # Wallet connect (no Snap) + read client
+│   ├── next.config.js
+│   └── package.json
+└── README.md
+```
+
+---
+
+## Run Locally
 
 ```bash
 npm install -g genlayer
 genlayer network set studionet
+genlayer account create --name deployer --password "yourpass"
+genlayer account unlock --password "yourpass"
 genlayer deploy --contract contracts/contract_audit.py
 
-cd frontend && npm install && npm run dev
+cd frontend
+npm install
+npm run dev
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Smart contract | Python — GenLayer Intelligent Contract |
+| AI consensus | `gl.vm.run_nondet_unsafe` + partial field matching |
+| Frontend | Next.js (static export) + TypeScript |
+| SDK | genlayer-js |
+| Hosting | Cloudflare Pages |
+
+---
+
+## Disclaimer
+
+ContractAudit is an AI-assisted screening tool, not a substitute for a professional human audit on production contracts handling real value.
 
 ---
 
