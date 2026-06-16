@@ -17,10 +17,10 @@ ContractAudit gives you an instant, multi-AI-verified security review. Not a rep
 
 ## How It Works
 
-1. **Connect your wallet** (MetaMask, Rabby, or any EVM wallet — no Snap required)
-2. **Submit code** — paste a contract (Solidity, Python, Rust, Move), add context, pay a small fee.
-3. **Run the audit** — a panel of GenLayer AI validators independently analyzes it.
-4. **Read the report** — severity rating, list of issues with locations and fixes, and an overall score — stored on-chain.
+1. **Connect your wallet** (MetaMask, Rabby, or any EVM wallet)
+2. **Submit code** paste a contract (Solidity, Python, Rust, Move), add context, pay a small fee.
+3. **Run the audit** a panel of GenLayer AI validators independently analyzes it.
+4. **Read the report** severity rating, list of issues with locations and fixes, and an overall score — stored on-chain.
 
 ---
 
@@ -35,13 +35,13 @@ ContractAudit gives you an instant, multi-AI-verified security review. Not a rep
 
 ## Why GenLayer?
 
-A normal contract can't read and reason about source code. GenLayer validators each analyze the code independently and must agree on the **severity** (exact match), **score** (±2), and **issue count** (±1) before the report finalizes — so one AI "having a bad day" can't stamp a vulnerable contract as safe.
+A normal contract can't read and reason about source code. GenLayer validators each analyze the code independently and must agree on the **severity** (exact match), **score** (±2), and **issue count** (±1) before the report finalizes so one AI "having a bad day" can't stamp a vulnerable contract as safe.
 
 ---
 
 ## Wallet & Network
 
-Standard EVM wallet, normal signing popup — **no GenLayer Snap**. On connect it adds/switches to the **GenLayer Studio Network** (chain `61999`, RPC `https://studio.genlayer.com/api`).
+Standard EVM wallet, normal signing popup **no GenLayer Snap**. On connect it adds/switches to the **GenLayer Studio Network** (chain `61999`, RPC `https://studio.genlayer.com/api`).
 
 ---
 
