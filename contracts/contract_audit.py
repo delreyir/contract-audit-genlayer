@@ -72,20 +72,47 @@ Return JSON:
     "summary": "brief overall assessment",
     "score": 1-10 (10 = perfectly secure)
 }}"""
-            response = gl.nondet.exec_prompt(prompt)
-            return json.loads(response)
+            raw = gl.nondet.exec_prompt(prompt, response_format="json")
+            if not isinstance(raw, dict):
+                raw = {}
+            severity = str(raw.get("severity", "low")).strip().lower()
+            if severity not in ("critical", "high", "medium", "low", "clean"):
+                severity = "low"
+            try:
+                score = max(1, min(10, int(raw.get("score", 5))))
+            except (TypeError, ValueError):
+                score = 5
+            try:
+                issues_count = max(0, int(raw.get("issues_count", 0)))
+            except (TypeError, ValueError):
+                issues_count = 0
+            return {
+                "severity": severity,
+                "issues_count": issues_count,
+                "issues": raw.get("issues", []),
+                "summary": str(raw.get("summary", ""))[:1000],
+                "score": score,
+            }
 
         def validator_fn(leader_result) -> bool:
+            # Robust consensus: validators only need to agree on the normalized
+            # severity. Scores / issue counts vary between models and are kept
+            # for display but do not gate consensus.
             if not isinstance(leader_result, gl.vm.Return):
                 return False
-            validator_data = leader_fn()
-            leader_data = leader_result.calldata
-            # Severity must match, score within ±2, issue count within ±1
-            return (leader_data["severity"] == validator_data["severity"]
-                    and abs(leader_data["score"] - validator_data["score"]) <= 2
-                    and abs(leader_data["issues_count"] - validator_data["issues_count"]) <= 1)
+            raw = gl.nondet.exec_prompt(prompt, response_format="json")
+            if not isinstance(raw, dict):
+                raw = {}
+            severity = str(raw.get("severity", "low")).strip().lower()
+            if severity not in ("critical", "high", "medium", "low", "clean"):
+                severity = "low"
+            try:
+                leader_sev = str(leader_result.calldata["severity"]).strip().lower()
+            except (TypeError, KeyError):
+                return False
+            return severity == leader_sev
 
-        result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        result = gl.vm.run_nondet(leader_fn, validator_fn)
 
         audit["status"] = 1
         audit["report"] = json.dumps(result)
